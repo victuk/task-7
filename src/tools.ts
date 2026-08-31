@@ -1,4 +1,4 @@
-import { createTool, ToolExecuteFunction, ToolExecutionContext } from "@mastra/core/tools";
+import { createTool } from "@mastra/core/tools";
 import { MDocument } from "@mastra/rag";
 import { z } from "zod";
 
@@ -38,7 +38,7 @@ export const calculatorTool = createTool({
   },
 });
 
-// 3. Time Tool
+
 export const timeTool = createTool({
   id: "get-current-time",
   description: "Get the current time in UTC",
@@ -51,7 +51,7 @@ export const timeTool = createTool({
   },
 });
 
-// 4. RAG Knowledge Base Search Tool
+
 export const ragTool = createTool({
   id: "knowledge-base-search",
   description: "Tell users about employee paid time off and location of the primary server cluster's location",
@@ -62,19 +62,16 @@ export const ragTool = createTool({
     results: z.array(z.string()),
   }),
   execute: async ({ query }) => {
-    // 1. Create document instance
     const doc = MDocument.fromText(
       "Internal Policy: Employees at Kodehauz get 25 days of paid time off. The primary server cluster is located in Jos, Nigeria."
     );
 
-    // 2. doc.chunk() is synchronous. Pass a chunking strategy:
     const chunks = await doc.chunk({
       strategy: "recursive",
       size: 512,
       overlap: 50,
     });
 
-    // 3. Filter and extract text matching the query
     const matches = chunks
       .map((c) => (typeof c === "string" ? c : c.text))
       .filter((text) => text && text.toLowerCase().includes(query.toLowerCase()));
