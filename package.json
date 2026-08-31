@@ -1,0 +1,25 @@
+{
+  "name": "task-7",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "dev": "tsx watch src/cli.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.52",
+    "@mastra/core": "^1.63.2",
+    "@mastra/libsql": "^1.22.2",
+    "@mastra/pg": "^1.22.2",
+    "@mastra/rag": "^0.1.23",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
+    "ai": "^7.0.85",
+    "dotenv": "^16.4.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
