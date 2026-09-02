@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "tsx src/cli.ts",
-    "dev": "tsx watch src/cli.ts"
+    "start": "tsx cli.ts",
+    "dev": "tsx watch cli.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.52",

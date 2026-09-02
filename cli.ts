@@ -1,8 +1,8 @@
 import readline from "node:readline";
 import "dotenv/config";
-import { mastra } from "./index";
+import { mastra } from "./src/index";
 import { BaseMessageListItem } from "@mastra/core/agent/message-list";
-import { ingestDocument } from "./rag/store";
+import { ingestDocument } from "./src/rag/store";
 
 const rl = readline.createInterface({
   input: process.stdin,
