@@ -57,36 +57,27 @@ export const hotelScheduleTool = createTool({
   id: 'get_hotel_schedule',
 
   description:
-    'Returns mock hotel options and nightly hotel prices in USD for a city.',
+    'Returns hotel options and nightly hotel prices in USD for a city.',
 
   inputSchema: z.object({
-    city: z.string().describe('City where the hotels are located'),
+    location: z.string().describe('City or area for hotel stay (e.g., Nairobi)'),
+    nights: z.number().describe('Total number of nights to stay'),
   }),
-
   outputSchema: z.object({
-    city: z.string(),
-
-    hotels: z.array(
-      z.object({
-        name: z.string(),
-        priceUsd: z.number(),
-      }),
-    ),
+    location: z.string(),
+    currency: z.string(),
+    nights: z.number(),
+    pricePerNight: z.number(),
+    totalPrice: z.number(),
   }),
-
-  execute: async ({ city }) => {
+  execute: async ({ location, nights }) => {
+    const pricePerNight = 120.0;
     return {
-      city,
-      hotels: [
-        {
-          name: 'Nairobi Serena',
-          priceUsd: 250,
-        },
-        {
-          name: 'Radisson Blu',
-          priceUsd: 200,
-        },
-      ],
+      location,
+      nights,
+      pricePerNight,
+      totalPrice: pricePerNight * nights,
+      currency: "USD",
     };
   },
 });
@@ -94,23 +85,28 @@ export const hotelScheduleTool = createTool({
 export const flightScheduleTool = createTool({
   id: 'get_flight_schedule',
   description:
-    'Returns a mock one-way flight duration and one-way price in USD between two cities.',
+    'Returns a one-way flight duration and one-way price in USD between two cities.',
   inputSchema: z.object({
-    origin: z.string().describe('Departure city'),
-    destination: z.string().describe('Destination city'),
+    origin: z.string().describe('The city your are departing in which you ar flying from'),
+    destination: z.string().describe('The city of destination in which you are flying to'),
   }),
   outputSchema: z.object({
     origin: z.string(),
     destination: z.string(),
-    flightTimeHours: z.number(),
-    priceUsd: z.number(),
+    outboundFlightHours: z.number(),
+    returnFlightHours: z.number(),
+    roundtripPriceUsd: z.number(),
+    currency: z.string(),
   }),
   execute: async ({ origin, destination }) => {
     return {
       origin,
       destination,
-      flightTimeHours: 5.5,
-      priceUsd: 920,
+      outboundFlightHours: 5.5,
+      returnFlightHours: 5.5,
+      totalFlightTimeHours: 11.0,
+      roundtripPriceUsd: 650,
+      currency: "USD"
     };
   },
 });
@@ -163,29 +159,41 @@ export const currencyConverterTool = createTool({
   description: 'Converts a money between supported currencies.',
   inputSchema: z.object({
     amount: z.number().describe('Amount to convert'),
-    fromCurrency: z.string().describe('Source currency code'),
-    toCurrency: z.string().describe('Target currency code'),
+    fromCurrency: z.string().describe('Source currency currency'),
+    toCurrency: z.string().describe('Target currency currency'),
   }),
   outputSchema: z.object({
     originalAmount: z.number(),
-    originalCurrency: z.string(),
+    fromCurrency: z.string(),
+    toCurrency: z.string(),
     exchangeRate: z.number(),
-    amountConverted: z.number(),
-    currency: z.string(),
+    convertedAmount: z.number(),
   }),
   execute: async ({ amount, fromCurrency, toCurrency }) => {
     const source = fromCurrency.toUpperCase();
     const target = toCurrency.toUpperCase();
-    const exchangeRates: Record<string, number> = {
-      'USD-NGN': 1400,
-    };
-    const rate = exchangeRates[`${source}-${target}`];
+    const rates: {[value: string]: number} = {
+    USD: 1.0,
+    NGN: 1500.0,
+    KES: 130.0,
+    EUR: 0.92,
+    GBP: 0.78,
+  };
+
+  const fromRate = rates[source] || 1.0;
+  const toRate = rates[target] || 1.0;
+
+  const amountInUsd = amount / fromRate;
+  const convertedAmount = amountInUsd * toRate;
     return {
       originalAmount: amount,
-      originalCurrency: source,
-      exchangeRate: rate,
-      amountConverted: amount * rate,
-      currency: target,
+      fromCurrency: fromCurrency.toUpperCase(),
+      toCurrency: toCurrency.toUpperCase(),
+      convertedAmount: Number(convertedAmount.toFixed(2)),
+      exchangeRate: Number((toRate / fromRate).toFixed(4)),
     };
   },
 });
+/*
+I'm flying from Lagos to Nairobi for a 3-night conference and need to book a hotel there too. Work out the flight schedule and the hotel cost, convert the total logistics cost to NGN, and then check our internal travel policy to tell me whether this trip needs pre-approval and wh at the approved hotel budget per night is.
+*/
