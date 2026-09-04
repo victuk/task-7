@@ -1,7 +1,7 @@
 import { Agent } from "@mastra/core/agent";
 import { weatherTool, calculatorTool, timeTool, ragTool, hotelScheduleTool, flightScheduleTool, currencyConverterTool } from "./tools";
 
-const modelName = process.env.MODEL_NAME!! || "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free";
+const modelName = "openrouter/" + (process.env.MODEL_NAME!! || "nvidia/nemotron-3-ultra-550b-a55b:free");
 
 export const assistantAgent = new Agent({
     id: "assistant-agent",

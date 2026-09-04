@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "mastra dev",
+    "build": "mastra build",
+    "start": "mastra start",
     "cli": "tsx cli.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.52",
+    "@mastra/client-js": "^1.43.0",
     "@mastra/core": "^1.63.2",
     "@mastra/libsql": "^1.22.2",
     "@mastra/pg": "^1.22.2",
