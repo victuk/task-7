@@ -53,6 +53,11 @@ function promptUser() {
       }
       process.stdout.write("\n\n");
 
+      if(!fullResponse) {
+        process.stdout.write("No response at the moment, please try again.");
+        promptUser();
+      }
+
       conversationHistory.push({ role: "assistant", content: fullResponse });
     } catch (error: any) {
       console.error("\n\x1b[31m[Error generating response]:\x1b[0m", error?.message || error);
