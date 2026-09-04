@@ -158,7 +158,7 @@ export const ragTool = createTool({
   },
 });
 
-export const convertCurrencyTool = createTool({
+export const currencyConverterTool = createTool({
   id: 'convert_currency',
   description: 'Converts a money between supported currencies.',
   inputSchema: z.object({
