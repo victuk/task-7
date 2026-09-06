@@ -1,2 +1,9 @@
 .env
 node_modules
+local.db
+local.db-shm
+local.db-wal
+*.db
+*.db-shm
+*.db-wal
+.mastra

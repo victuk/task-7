@@ -1,9 +1,7 @@
 import { createTool } from "@mastra/core/tools";
-import { MDocument } from "@mastra/rag";
 import { z } from "zod";
 import { embed } from "ai";
 import { vectorStore, embeddingModel, INDEX_NAME } from "./rag/store";
-
 
 export const weatherTool = createTool({
   id: "get-weather",
@@ -15,14 +13,13 @@ export const weatherTool = createTool({
     temperature: z.number(),
     conditions: z.string(),
   }),
-  execute: async ({ city } ) => {
+  execute: async ({ city }) => {
     return {
       temperature: 22,
       conditions: `Partly cloudy in ${city}`,
     };
   },
 });
-
 
 export const calculatorTool = createTool({
   id: "calculator",
@@ -31,15 +28,26 @@ export const calculatorTool = createTool({
     expression: z.string().describe("Mathematical expression to evaluate (e.g., '12 * 45')"),
   }),
   outputSchema: z.object({
-    result: z.number(),
+    result: z.number().finite(),
   }),
-  execute: async ({expression}) => {
-    const sanitized = expression.replace(/[^0-9+\-*/().]/g, "");
-    const result = Function(`"use strict"; return (${sanitized})`)();
-    return { result: Number(result) };
+  execute: async ({ expression }) => {
+    const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, "").trim();
+    if (!sanitized) {
+      throw new Error(`Invalid expression "${expression}": nothing to calculate.`);
+    }
+    let evaluated: unknown;
+    try {
+      evaluated = Function(`"use strict"; return (${sanitized})`)();
+    } catch {
+      throw new Error(`Invalid expression "${expression}": could not be evaluated.`);
+    }
+    const result = Number(evaluated);
+    if (!Number.isFinite(result)) {
+      throw new Error(`Expression "${expression}" did not evaluate to a finite number.`);
+    }
+    return { result };
   },
 });
-
 
 export const timeTool = createTool({
   id: "get-current-time",
@@ -54,14 +62,11 @@ export const timeTool = createTool({
 });
 
 export const hotelScheduleTool = createTool({
-  id: 'get_hotel_schedule',
-
-  description:
-    'Returns hotel options and nightly hotel prices in USD for a city.',
-
+  id: "get_hotel_schedule",
+  description: "Returns hotel options and nightly hotel prices in USD for a city.",
   inputSchema: z.object({
-    location: z.string().describe('City or area for hotel stay (e.g., Nairobi)'),
-    nights: z.number().describe('Total number of nights to stay'),
+    location: z.string().describe("City or area for hotel stay (e.g., Nairobi)"),
+    nights: z.number().int().positive().describe("Total number of nights to stay"),
   }),
   outputSchema: z.object({
     location: z.string(),
@@ -83,42 +88,36 @@ export const hotelScheduleTool = createTool({
 });
 
 export const flightScheduleTool = createTool({
-  id: 'get_flight_schedule',
+  id: "get_flight_schedule",
   description:
-    'Returns a one-way flight duration and one-way price in USD between two cities.',
+    "Returns the outbound and return flight durations (hours) and the round-trip price in USD between two cities.",
   inputSchema: z.object({
-    origin: z.string().describe('The city your are departing in which you ar flying from'),
-    destination: z.string().describe('The city of destination in which you are flying to'),
+    origin: z.string().describe("The city you are departing from"),
+    destination: z.string().describe("The destination city you are flying to"),
   }),
   outputSchema: z.object({
     origin: z.string(),
     destination: z.string(),
     outboundFlightHours: z.number(),
     returnFlightHours: z.number(),
+    totalFlightTimeHours: z.number(),
     roundtripPriceUsd: z.number(),
     currency: z.string(),
   }),
   execute: async ({ origin, destination }) => {
+    const outboundFlightHours = 5.5;
+    const returnFlightHours = 5.5;
     return {
       origin,
       destination,
-      outboundFlightHours: 5.5,
-      returnFlightHours: 5.5,
-      totalFlightTimeHours: 11.0,
+      outboundFlightHours,
+      returnFlightHours,
+      totalFlightTimeHours: outboundFlightHours + returnFlightHours,
       roundtripPriceUsd: 650,
-      currency: "USD"
+      currency: "USD",
     };
   },
 });
-
-
-interface RagInput {
-  query: string;
-}
-
-interface RagOutput {
-  results: string[];
-}
 
 export const ragTool = createTool({
   id: "knowledge-base-search",
@@ -129,21 +128,18 @@ export const ragTool = createTool({
   outputSchema: z.object({
     results: z.array(z.string()),
   }),
-  execute: async ({ query }: RagInput): Promise<RagOutput> => {
-    // 1. Generate the embedding vector for the search query
+  execute: async ({ query }) => {
     const { embedding } = await embed({
       model: embeddingModel,
       value: query,
     });
 
-    // 2. RETRIEVE: Query vector store using the generated vector
     const searchResults = await vectorStore.query({
       indexName: INDEX_NAME,
       queryVector: embedding,
       topK: 3,
     });
 
-    // 3. Extract the text field stored in metadata during ingestion
     const matches: string[] = searchResults
       .map((res: any) => res.metadata?.text)
       .filter((text: unknown): text is string => typeof text === "string" && text.length > 0);
@@ -154,13 +150,27 @@ export const ragTool = createTool({
   },
 });
 
+const SUPPORTED_CURRENCIES = ["USD", "NGN", "KES", "EUR", "GBP"] as const;
+
+const RATES: Record<(typeof SUPPORTED_CURRENCIES)[number], number> = {
+  USD: 1.0,
+  NGN: 1500.0,
+  KES: 130.0,
+  EUR: 0.92,
+  GBP: 0.78,
+};
+
 export const currencyConverterTool = createTool({
-  id: 'convert_currency',
-  description: 'Converts a money between supported currencies.',
+  id: "convert_currency",
+  description: `Converts an amount between supported currencies (${SUPPORTED_CURRENCIES.join(", ")}).`,
   inputSchema: z.object({
-    amount: z.number().describe('Amount to convert'),
-    fromCurrency: z.string().describe('Source currency currency'),
-    toCurrency: z.string().describe('Target currency currency'),
+    amount: z.number().positive().describe("Amount to convert"),
+    fromCurrency: z
+      .enum(SUPPORTED_CURRENCIES)
+      .describe(`Source currency, one of: ${SUPPORTED_CURRENCIES.join(", ")}`),
+    toCurrency: z
+      .enum(SUPPORTED_CURRENCIES)
+      .describe(`Target currency, one of: ${SUPPORTED_CURRENCIES.join(", ")}`),
   }),
   outputSchema: z.object({
     originalAmount: z.number(),
@@ -170,30 +180,15 @@ export const currencyConverterTool = createTool({
     convertedAmount: z.number(),
   }),
   execute: async ({ amount, fromCurrency, toCurrency }) => {
-    const source = fromCurrency.toUpperCase();
-    const target = toCurrency.toUpperCase();
-    const rates: {[value: string]: number} = {
-    USD: 1.0,
-    NGN: 1500.0,
-    KES: 130.0,
-    EUR: 0.92,
-    GBP: 0.78,
-  };
-
-  const fromRate = rates[source] || 1.0;
-  const toRate = rates[target] || 1.0;
-
-  const amountInUsd = amount / fromRate;
-  const convertedAmount = amountInUsd * toRate;
+    const fromRate = RATES[fromCurrency];
+    const toRate = RATES[toCurrency];
+    const convertedAmount = (amount / fromRate) * toRate;
     return {
       originalAmount: amount,
-      fromCurrency: fromCurrency.toUpperCase(),
-      toCurrency: toCurrency.toUpperCase(),
+      fromCurrency,
+      toCurrency,
       convertedAmount: Number(convertedAmount.toFixed(2)),
       exchangeRate: Number((toRate / fromRate).toFixed(4)),
     };
   },
 });
-/*
-I'm flying from Lagos to Nairobi for a 3-night conference and need to book a hotel there too. Work out the flight schedule and the hotel cost, convert the total logistics cost to NGN, and then check our internal travel policy to tell me whether this trip needs pre-approval and wh at the approved hotel budget per night is.
-*/

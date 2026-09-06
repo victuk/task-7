@@ -1,20 +1,20 @@
 import readline from "node:readline";
+import { randomUUID } from "node:crypto";
 import "dotenv/config";
-import { mastra } from "./src/index";
-import { BaseMessageListItem } from "@mastra/core/agent/message-list";
-import { ingestDocument } from "./src/rag/store";
+import { mastra } from "./src/mastra/index";
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-await ingestDocument(
-  "policy-001",
-  "Internal Policy: Employees at Kodehauz get 25 days of paid time off. The primary server cluster is located in Jos, Nigeria.",
-);
+const THREAD_ID = `cli-${randomUUID()}`;
+const RESOURCE_ID = "cli-user";
 
-const conversationHistory: BaseMessageListItem[] = [];
+let stdinClosed = false;
+rl.on("close", () => {
+  stdinClosed = true;
+});
 
 console.clear();
 console.log(
@@ -26,52 +26,63 @@ console.log(
   "\x1b[36m========================================================\x1b[0m\n",
 );
 
-function promptUser() {
-  rl.question("\x1b[32mYou > \x1b[0m", async (input) => {
-    try {
-      const agent = mastra.getAgent("assistantAgent");
-      const userInput = input.trim();
-      if (!userInput) {
-        promptUser();
-        return;
-      }
+async function generateResponse(userInput: string): Promise<void> {
+  const agent = mastra.getAgent("assistantAgent");
 
-      if (userInput.toLowerCase() === "exit") {
-        cleanupAndExit();
-        return;
-      }
-      conversationHistory.push({ role: "user", content: userInput });
+  process.stdout.write("\x1b[34mAI > \x1b[0m");
 
-      process.stdout.write("\x1b[34mAI > \x1b[0m");
+  let fullResponse = "";
+  const streamResponse = await agent.stream(userInput, {
+    maxSteps: 8,
+    memory: {
+      thread: THREAD_ID,
+      resource: RESOURCE_ID,
+    },
+  });
 
-      let fullResponse = "";
-      const streamResponse = await agent.stream(conversationHistory, {maxSteps: 8});
+  for await (const chunk of streamResponse.textStream) {
+    process.stdout.write(chunk);
+    fullResponse += chunk;
+  }
+  process.stdout.write("\n\n");
 
-      for await (const chunk of streamResponse.textStream) {
-        process.stdout.write(chunk);
-        fullResponse += chunk;
-      }
-      process.stdout.write("\n\n");
+  if (!fullResponse) {
+    console.log("No response at the moment, please try again with the same prompt or adjust your prompt.");
+  }
+}
 
-      if (!fullResponse) {
-        process.stdout.write("No response at the moment, please try again with same prompt or adjust your prompt.");
-        promptUser();
-      }
-
-      conversationHistory.push({ role: "assistant", content: fullResponse });
-    } catch (error: any) {
-      console.error(
-        "\n\x1b[31m[Error generating response]:\x1b[0m",
-        error?.message,
-      );
-      // console.log();
+function promptUser(): void {
+  if (stdinClosed) {
+    cleanupAndExit();
+    return;
+  }
+  rl.question("\x1b[32mYou > \x1b[0m", (input) => {
+    const userInput = input.trim();
+    if (!userInput) {
+      promptUser();
+      return;
     }
 
-    promptUser();
+    if (userInput.toLowerCase() === "exit") {
+      cleanupAndExit();
+      return;
+    }
+
+    generateResponse(userInput)
+      .catch((error: any) => {
+        console.error("\n\x1b[31m[Error generating response]:\x1b[0m", error?.message ?? error);
+      })
+      .finally(() => {
+        if (stdinClosed) {
+          cleanupAndExit();
+          return;
+        }
+        promptUser();
+      });
   });
 }
 
-function cleanupAndExit() {
+function cleanupAndExit(): void {
   console.log("\n\x1b[33mGoodbye!\x1b[0m");
   rl.close();
   process.exit(0);
