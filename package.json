@@ -6,7 +6,7 @@
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "mastra start",
-    "cli": "tsx cli.ts",
+    "cli": "tsx src/ingest.ts && tsx cli.ts",
     "ingest": "tsx src/ingest.ts",
     "typecheck": "tsc --noEmit"
   },
