@@ -45,7 +45,7 @@ function promptUser() {
       process.stdout.write("\x1b[34mAI > \x1b[0m");
 
       let fullResponse = "";
-      const streamResponse = await agent.stream(conversationHistory);
+      const streamResponse = await agent.stream(conversationHistory, {maxSteps: 8});
 
       for await (const chunk of streamResponse.textStream) {
         process.stdout.write(chunk);
